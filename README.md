@@ -5,6 +5,35 @@
 
 ---
 
+## Mục lục
+
+1. [Nhóm thực hiện](#nhóm-thực-hiện)
+2. [Tổng quan](#tổng-quan)
+3. [Kết quả chính](#kết-quả-chính)
+4. [Cấu trúc Pipeline](#cấu-trúc-pipeline)
+5. [Subset Strategy](#subset-strategy)
+6. [Cấu trúc Project](#cấu-trúc-project)
+7. [Cài đặt & Chạy](#cài-đặt--chạy)
+8. [Streamlit App](#streamlit-app)
+9. [Stack kỹ thuật](#stack-kỹ-thuật)
+10. [Tham chiếu](#tham-chiếu)
+
+---
+
+## Nhóm thực hiện
+
+| MSHV | Họ và tên |
+|---|---|
+| C25611254 | Lê Nhật Thanh |
+| C25611253 | Lê Ngọc Phú |
+| C25611251 | Huỳnh Trúc Ngân |
+| C25611258 | Phạm Thị Thúy Kiều |
+| C25611256 | Trịnh Quang Tân |
+
+**GVHD:** TS. Trần Duy Thanh
+
+---
+
 ## Tổng quan
 
 Đồ án xây dựng một **pipeline dự báo hoàn chỉnh 4 chương** cho bài toán quản trị tồn kho chuỗi bán lẻ đa SKU, áp dụng trên dữ liệu thực từ cuộc thi Kaggle M5 Forecasting Accuracy (Walmart).
@@ -59,25 +88,38 @@ Ch4 · Probabilistic    →  Quantile GBR P10/P50/P90, Pinball Loss backtesting,
 
 ---
 
-## Cấu trúc thư mục
+## Cấu trúc Project
 
 ```
-Bài nhóm/
-├── pipeline_m5_walmart.py     # Pipeline đầy đủ 5 cell (#%%)
-├── app.py                     # Streamlit app 3 tab
-├── requirements.txt
+m5-walmart-inventory-forecast/
+│
+├── app.py                          # Streamlit app (3 tab)
+├── pipeline_m5_walmart.py          # Pipeline đầy đủ 4 chương (5 cell #%%)
+├── requirements.txt                # Thư viện Python
+├── README.md
+│
 ├── Datasets/
-│   ├── m5_ca1_foods_clean.csv # ← subset đã xử lý (2.6 MB, dùng cho app)
-│   └── calendar.csv           # Lịch sự kiện Walmart
+│   ├── m5_ca1_foods_clean.csv      # Subset đã xử lý — CA_1/FOODS/Top30 (2.6 MB)
+│   └── calendar.csv                # Lịch sự kiện Walmart (103 KB)
+│
 ├── models/
-│   ├── quantile_models.pkl    # Q10 / Q50 / Q90 GBR
-│   ├── label_encoder.pkl
-│   ├── features.pkl
-│   └── inventory_table.csv    # Safety Stock & ROP cho 30 SKU
-└── ch1_*.png / ch2_*.png / ch3_*.png / ch4_*.png   # Biểu đồ xuất ra
+│   ├── quantile_models.pkl         # Quantile GBR: P10 / P50 / P90 (1.4 MB)
+│   ├── label_encoder.pkl           # SKU label encoder
+│   ├── features.pkl                # Danh sách features theo thứ tự
+│   └── inventory_table.csv         # Safety Stock & ROP cho 30 SKU
+│
+├── ch1_pd1_timeseries.png          # EDA — Chuỗi thời gian Top 5 SKU
+├── ch1_pd2_dist_corr.png           # EDA — Phân phối & ma trận tương quan
+├── ch1_pd3_boxplot.png             # EDA — Boxplot outlier (IQR)
+├── ch1_pd4_unit_economics.png      # EDA — Doanh thu theo SKU
+├── ch2_stl_decomposition.png       # STL + HP Filter — 4 thành phần T/C/S/R
+├── ch3_feature_importance.png      # GBR — Feature importance
+├── ch3_walkforward_cv.png          # GBR — Walk-Forward CV 5 folds
+├── ch4_risk_band.png               # Quantile — Dải băng P10/P50/P90
+└── ch4_inventory_strategy.png      # Inventory — Safety Stock & ROP table
 ```
 
-> **Lưu ý:** File raw M5 (sales_train_*.csv, sell_prices.csv) không đưa lên GitHub do kích thước 115–194 MB.  
+> **Lưu ý:** File raw M5 (`sales_train_*.csv`, `sell_prices.csv`) không đưa lên GitHub do kích thước 115–194 MB.  
 > Tải về từ: [Kaggle M5 Forecasting Accuracy](https://www.kaggle.com/competitions/m5-forecasting-accuracy/data)
 
 ---
@@ -86,7 +128,7 @@ Bài nhóm/
 
 ```bash
 # 1. Clone repo
-git clone https://github.com/YOUR_USERNAME/m5-walmart-inventory-forecast.git
+git clone https://github.com/lenhatthanh2302/m5-walmart-inventory-forecast.git
 cd m5-walmart-inventory-forecast
 
 # 2. Tải raw M5 data từ Kaggle → bỏ vào Datasets/
@@ -94,7 +136,7 @@ cd m5-walmart-inventory-forecast
 # 3. Cài thư viện
 pip install -r requirements.txt
 
-# 4. Chạy pipeline (tạo clean CSV + model)
+# 4. Chạy pipeline (sinh clean CSV + model .pkl)
 python pipeline_m5_walmart.py
 
 # 5. Chạy Streamlit app

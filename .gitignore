@@ -1,0 +1,23 @@
+# Raw M5 dataset files (too large for GitHub)
+Datasets/sales_train_validation.csv
+Datasets/sales_train_evaluation.csv
+Datasets/sell_prices.csv
+Datasets/sample_submission.csv
+
+# IDE
+.idea/
+
+# Screenshots
+screencapture-*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db

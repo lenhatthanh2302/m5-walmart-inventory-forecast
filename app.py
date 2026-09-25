@@ -219,9 +219,10 @@ with tab1:
                  help="P90 - P10 trung bình — độ không chắc chắn của dự báo")
 
     # [Fix 3] Cảnh báo khi P50 thấp hơn đáng kể so với lịch sử gần đây
+    # Bỏ qua SKU intermittent demand (hist_mean < 1) vì P50=0 là dự báo hợp lệ
     hist_mean = df_sku_hist["Sales"].mean()
     p50_mean  = p50_future.mean()
-    if hist_mean > 0 and (hist_mean - p50_mean) / hist_mean > 0.15:
+    if hist_mean >= 1.0 and (hist_mean - p50_mean) / hist_mean > 0.15:
         gap_pct = (hist_mean - p50_mean) / hist_mean * 100
         st.info(
             f"ℹ️ **P50 dự báo ({p50_mean:.1f} đv/ngày) thấp hơn ~{gap_pct:.0f}% so với "

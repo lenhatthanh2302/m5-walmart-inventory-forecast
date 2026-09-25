@@ -218,6 +218,19 @@ with tab1:
     col_d.metric("Độ rộng dải băng (TB)",         f"{(p90_future - p10_future).mean():.1f} đv",
                  help="P90 - P10 trung bình — độ không chắc chắn của dự báo")
 
+    # [Fix 3] Cảnh báo khi P50 thấp hơn đáng kể so với lịch sử gần đây
+    hist_mean = df_sku_hist["Sales"].mean()
+    p50_mean  = p50_future.mean()
+    if hist_mean > 0 and (hist_mean - p50_mean) / hist_mean > 0.15:
+        gap_pct = (hist_mean - p50_mean) / hist_mean * 100
+        st.info(
+            f"ℹ️ **P50 dự báo ({p50_mean:.1f} đv/ngày) thấp hơn ~{gap_pct:.0f}% so với "
+            f"doanh số bình quân 60 ngày gần nhất ({hist_mean:.1f} đv/ngày).** "
+            f"Điều này có thể phản ánh: (1) xu hướng giảm mùa vụ thực sự, "
+            f"hoặc (2) mô hình đang underforecast do thiếu feature sự kiện (SNAP, holiday). "
+            f"Nên đối chiếu với lịch sử cùng kỳ năm trước trước khi đặt hàng."
+        )
+
     # Nút xuất dữ liệu
     st.markdown("---")
     buf = io.BytesIO()
@@ -274,13 +287,33 @@ with tab2:
         st.markdown(f"### Phân tích Rủi ro Tồn kho — `{selected_sku}`")
 
         m1, m2, m3, m4, m5 = st.columns(5)
+        ss_days = round(ss_val / avg_s, 1) if avg_s > 0 else 0
+        q_review = round(avg_s * 7)
+
         m1.metric("TB Bán/ngày",     f"{avg_s} đv")
         m2.metric("Độ lệch chuẩn",   f"{std_s} đv")
         m3.metric("CV (Std/Mean)",    f"{cv_val:.2f}", help=cv_color + " " + cv_label)
         m4.metric("Safety Stock",     f"{ss_val} đv",
-                  help=f"SS = {Z_SCORE} × {std_s} × √{LEAD_TIME} = {ss_val}")
+                  help=(f"SS = {Z_SCORE} × {std_s} × √{LEAD_TIME} = {ss_val} đv "
+                        f"(≈ {ss_days} ngày doanh số)"))
         m5.metric("Reorder Point",    f"{rop_val} đv",
                   help=f"ROP = {avg_s}×{LEAD_TIME} + {ss_val} = {rop_val}")
+
+        # [Fix 2] Cảnh báo CV > 1 — Normal approximation không còn chính xác
+        if cv_val > 1.0:
+            st.error(
+                f"⚠️ **CV = {cv_val:.2f} > 1.0** — Nhu cầu của SKU này có phân phối lệch rất cao "
+                f"(có nhiều ngày bằng 0 hoặc spike lớn). Xấp xỉ phân phối chuẩn không còn phù hợp, "
+                f"Safety Stock {ss_val} đv **có thể bị ước tính thấp hơn thực tế**. "
+                f"Cân nhắc nâng z-score hoặc dùng phân phối Negative Binomial."
+            )
+
+        # [Fix 7] Lưu ý về tính mùa vụ trong CV
+        st.caption(
+            f"📌 CV được tính trên toàn bộ chuỗi lịch sử (2013–2016). "
+            f"Trong các tháng cao điểm (Nov–Dec / SNAP week), biến động thực tế có thể cao hơn đáng kể — "
+            f"Safety Stock nên được review theo quý."
+        )
 
         st.markdown("---")
 
@@ -305,16 +338,26 @@ with tab2:
         )
         st.plotly_chart(fig_rop, use_container_width=True)
 
-        # Newsvendor
+        # [Fix 4] Lượng đặt hàng định kỳ gợi ý (Review Period = 7 ngày)
         st.markdown("---")
-        st.markdown(f"**Lượng Nhập Hàng Tối Ưu (Newsvendor):** "
-                    f"`q* = {q_star} đv` — Quantile P{CRITICAL_RATIO*100:.0f} "
-                    f"(Critical Ratio = Cu/(Cu+Co) = {CU_CO_RATIO}/{CU_CO_RATIO+1:.0f} = {CRITICAL_RATIO:.2f})")
-        st.caption(
-            f"Ý nghĩa: với giả định chi phí hết hàng (Cu) gấp {CU_CO_RATIO:.0f}× "
-            f"chi phí tồn kho thừa (Co), mô hình Newsvendor khuyến nghị nhập "
-            f"**{q_star} sản phẩm** — đủ để đáp ứng 75% các ngày có nhu cầu cao."
-        )
+        col_inv1, col_inv2 = st.columns(2)
+        with col_inv1:
+            st.markdown(f"**Lượng Đặt Hàng Gợi Ý (Continuous Review):**")
+            st.markdown(f"`Q = {q_review} đv`")
+            st.caption(
+                f"Q = TB Bán/ngày × Review Period (7 ngày) = {avg_s} × 7 = {q_review} đv. "
+                f"Đặt hàng khi tồn kho chạm ROP = {rop_val} đv."
+            )
+        with col_inv2:
+            st.markdown(f"**Lượng Nhập Hàng Tối Ưu (Newsvendor — Single Period):**")
+            st.markdown(f"`q* = {q_star} đv` — Quantile P{CRITICAL_RATIO*100:.0f}")
+            st.caption(
+                f"Critical Ratio = Cu/(Cu+Co) = {CU_CO_RATIO}/{CU_CO_RATIO+1:.0f} = {CRITICAL_RATIO:.2f}. "
+                f"Với giả định chi phí hết hàng (Cu) gấp {CU_CO_RATIO:.0f}× chi phí tồn kho thừa (Co), "
+                f"mô hình Newsvendor khuyến nghị {q_star} đv — phù hợp cho **đặt hàng hàng ngày** "
+                f"(sản phẩm tươi/perishable). "
+                f"⚠️ Không thay thế ROP — hai framework hoạt động độc lập."
+            )
     else:
         st.warning("Không tìm thấy dữ liệu tồn kho cho SKU này.")
 
@@ -334,7 +377,7 @@ with tab3:
     df_plot = df_inv.copy()
     df_plot["CV"] = (df_plot["Std Sales"] / df_plot["TB Sales/ngày"]).round(2)
     df_plot["Chiến lược"] = df_plot["CV"].apply(
-        lambda v: "Rủi ro cao 🔴" if v >= 0.5 else ("Trung bình 🟡" if v >= 0.25 else "Ổn định 🟢")
+        lambda v: "Rủi ro cao" if v >= 0.5 else ("Trung bình" if v >= 0.25 else "Ổn định")
     )
     df_plot["SKU_highlight"] = df_plot["SKU"] == sku_short
 
@@ -353,9 +396,9 @@ with tab3:
             "Chiến lược": False,
         },
         color_discrete_map={
-            "Rủi ro cao 🔴": "#e74c3c",
-            "Trung bình 🟡": "#f39c12",
-            "Ổn định 🟢":    "#27ae60",
+            "Rủi ro cao": "#e74c3c",
+            "Trung bình": "#f39c12",
+            "Ổn định":    "#27ae60",
         },
         size_max=45,
         labels={
@@ -384,6 +427,16 @@ with tab3:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
     )
     st.plotly_chart(fig_scatter, use_container_width=True)
+
+    # [Fix 6] Ghi chú nếu không có SKU nào trong nhóm "Ổn định"
+    n_stable = (df_plot["Chiến lược"] == "Ổn định").sum()
+    if n_stable == 0:
+        st.info(
+            "ℹ️ **Không có SKU nào trong nhóm 'Ổn định' (CV < 0.25)** — "
+            "toàn bộ 30 SKU FOODS tại CA_1 đều có biến động nhu cầu đáng kể. "
+            "Đây là đặc trưng của ngành thực phẩm (SNAP weeks, weekday/weekend pattern), "
+            "không phải lỗi mô hình."
+        )
 
     # Bảng tổng hợp đầy đủ
     st.markdown("---")

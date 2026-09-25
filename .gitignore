@@ -10,6 +10,9 @@ Datasets/sample_submission.csv
 # Screenshots
 screencapture-*.png
 
+# Generated chart outputs (reproducible from pipeline)
+*.png
+
 # Python
 __pycache__/
 *.pyc
